@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 ```bash
 export PYTHONPATH=.
-python3 cv_models/YOLOX//yolox_test.py
+python3 CV_Modles/YOLOX/yolox_test.py
 ```
 <br>
 
