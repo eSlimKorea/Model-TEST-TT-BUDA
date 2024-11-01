@@ -27,7 +27,7 @@ For a simple, starting basics of TT-Buda
 <br>
 `Test CV Models` -> [Run your first CV models with TT-Buda]().
 <br>
-`batched_inputs` -> [Learn how to run with batched inputs and how to benchmark models on TT-Buda]
+`batched_inputs` -> [Learn how to run with batched inputs and how to benchmark models on TT-Buda]().
 <br>
 
 
