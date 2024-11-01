@@ -29,7 +29,7 @@ python3 cv_models/YOLOX//yolox_test.py
 |----------------------|-----------------------|-----------------------|----------------|--------------------|---------------------|
 | YOLOv5               | ⏳                   | ⏳                   | ⏳            | ❌                  | v0.19.3           |    
 | YOLOv6               | ⏳                   | ⏳                   | ⏳            | ✔️                  | v0.19.3           |    
-| [YOLOX]().                | ⏳                   | ⏳                   | ⏳            | ✔️                  | v0.19.3           |    
+| [YOLOX](https://github.com/eSlimKorea/Model-TEST-TT-BUDA/tree/main/Model%20Test/CV_Models/YOLOX).                | ⏳                   | ⏳                   | ⏳            | ✔️                  | v0.19.3           |    
 | ResNet               | ⏳                   | ⏳                   | ⏳            | ✔️                  | v0.19.3           |    
 | Faster R-CNN         | ⏳                   | ⏳                   | ⏳            | ⏳                  | v0.19.3           |    
 | Hand Landmark        | ⏳                   | ⏳                   | ⏳            | ⏳                  | v0.19.3           |  
