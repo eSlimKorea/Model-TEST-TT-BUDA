@@ -23,9 +23,9 @@ For a simple, starting basics of TT-Buda
 
  - `install_ttbuda` ->  [Installation guide for TT-Buda](https://github.com/eSlimKorea/TT-Buda-Installation).
  - `Test NPL Models` -> [Run your first NLP models with TT-Buda]().
- - `Test CV Models` -> [Run your first CV models with TT-Buda](https://github.com/eSlimKorea/Model-TEST-TT-BUDA/tree/main/Model%20Test).
+ - `Test CV Models` -> [Run your first CV models with TT-Buda](https://github.com/eSlimKorea/Model-TEST-TT-BUDA/blob/main/Model%20Test/CV_Models/YOLOX/running_yolox.ipynb).
  - `batched_inputs` -> [Learn how to run with batched inputs and how to benchmark models on TT-Buda]().
 
 ## **Test Models**
 
-example code for running some popular AI/ML models, visit [here]().
+example code for running some popular AI/ML models, visit [here](https://github.com/eSlimKorea/Model-TEST-TT-BUDA/tree/main/Model%20Test).
