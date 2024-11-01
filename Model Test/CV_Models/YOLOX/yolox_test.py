@@ -1,14 +1,16 @@
 # SPDX-FileCopyrightText: © 2024 Tenstorrent AI ULC
 # SPDX-License-Identifier: Apache-2.0
 
-# YOLOX multiple images processing script
+# yolox demo script
 
 import subprocess
 
-# Install yolox==0.3.0 without installing its dependencies
-subprocess.run(["pip", "install", "yolox==0.3.0", "--no-deps"])
+subprocess.run(
+    ["pip", "install", "yolox==0.3.0", "--no-deps"]
+)  # Install yolox==0.3.0 without installing its dependencies
 
 import os
+
 import cv2
 import numpy as np
 import pybuda
@@ -23,7 +25,7 @@ from yolox.exp import get_exp
 from yolox.utils import demo_postprocess, multiclass_nms
 
 
-def run_yolox_multiple_images(variant, image_urls, batch_size=1):
+def run_yolox_pytorch(variant, batch_size=1):
 
     # Set PyBuda configuration parameters
     compiler_cfg = pybuda.config._get_global_compiler_config()
@@ -31,8 +33,7 @@ def run_yolox_multiple_images(variant, image_urls, batch_size=1):
     compiler_cfg.default_df_override = pybuda.DataFormat.Float16_b
     os.environ["PYBUDA_DECOMPOSE_SIGMOID"] = "1"
 
-
-       # Device specific configurations
+    # Device specific configurations
     available_devices = pybuda.detect_available_devices()
     if available_devices:
         if available_devices[0] == BackendDevice.Wormhole_B0:
@@ -202,17 +203,12 @@ def run_yolox_multiple_images(variant, image_urls, batch_size=1):
                 )
                 compiler_cfg.place_on_new_epoch("max_pool2d_671.dc.sparse_matmul.5.dc.sparse_matmul.1.lc2")
 
-
-
-                    # Prepare model
+    # prepare model
     weight_name = f"{variant}.pth"
     url = f"https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/{weight_name}"
-    if not os.path.exists(weight_name):
-        print(f"Downloading model weights from {url}")
-        response = requests.get(url)
-        with open(f"{weight_name}", "wb") as file:
-            file.write(response.content)
-        print("Model weights downloaded.")
+    response = requests.get(url)
+    with open(f"{weight_name}", "wb") as file:
+        file.write(response.content)
 
     if variant == "yolox_darknet":
         model_name = "yolov3"
@@ -227,15 +223,14 @@ def run_yolox_multiple_images(variant, image_urls, batch_size=1):
     model_name = f"pt_{variant}"
     tt_model = pybuda.PyTorchModule(f"pt_{variant}", model)
 
-    # Prepare input shape
+    # prepare input
     if variant in ["yolox_nano", "yolox_tiny"]:
         input_shape = (416, 416)
     else:
         input_shape = (640, 640)
 
-    test_url = "http://images.cocodataset.org/val2017/000000397133.jpg"
-    response = requests.get(test_url)
-
+    url = "http://images.cocodataset.org/val2017/000000397133.jpg"
+    response = requests.get(url)
     with open("input.jpg", "wb") as f:
         f.write(response.content)
     img = cv2.imread("input.jpg")
@@ -248,113 +243,39 @@ def run_yolox_multiple_images(variant, image_urls, batch_size=1):
     output_q = pybuda.run_inference(tt_model, inputs=[(batch_input)])
     output = output_q.get()
 
+    # Combine outputs for data parallel runs
+    if os.environ.get("PYBUDA_N300_DATA_PARALLEL", "0") == "1":
+        concat_tensor = torch.cat((output[0].to_pytorch(), output[1].to_pytorch()), dim=0)
+        buda_tensor = pybuda.Tensor.create_from_torch(concat_tensor)
+        output = [buda_tensor]
 
+    # Post-processing
+    for i in range(len(output)):
+        output[i] = output[i].value().detach().float().numpy()
 
-    # Process each image in the list
-    for idx, img_url in enumerate(image_urls):
-        try:
-            # Download image
-            response = requests.get(img_url)
-            img_name = f"input_{idx}.jpg"
-            with open(img_name, "wb") as f:
-                f.write(response.content)
-            print(f"Image {idx + 1} downloaded.")
+    predictions = demo_postprocess(output[0], input_shape)[0]
+    boxes = predictions[:, :4]
+    scores = predictions[:, 4:5] * predictions[:, 5:]
+    boxes_xyxy = np.ones_like(boxes)
+    boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.0
+    boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.0
+    boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.0
+    boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.0
+    boxes_xyxy /= ratio
+    dets = multiclass_nms(boxes_xyxy, scores, nms_thr=0.45, score_thr=0.1)
+    if dets is not None:
+        final_boxes, final_scores, final_cls_inds = dets[:, :4], dets[:, 4], dets[:, 5]
+        for box, score, cls_ind in zip(final_boxes, final_scores, final_cls_inds):
+            class_name = COCO_CLASSES[int(cls_ind)]
+            x_min, y_min, x_max, y_max = box
+            print(f"Class: {class_name}, Confidence: {score}, Coordinates: ({x_min}, {y_min}, {x_max}, {y_max})")
 
-            # Read and preprocess image
-            img = cv2.imread(img_name)
-            orig_img = img.copy()  # Save original image for drawing
-            img, ratio = preprocess(img, input_shape)
-            img_tensor = torch.from_numpy(img).unsqueeze(0)
-            batch_input = torch.cat([img_tensor] * batch_size, dim=0)
+    # remove downloaded weights,image
+    os.remove(weight_name)
+    os.remove("input.jpg")
 
-          
-
-            # Post-processing
-            if isinstance(output, list):
-                output = output[0]
-            if isinstance(output, pybuda.Tensor):
-                output_array = output.value().detach().float().numpy()
-            elif isinstance(output, torch.Tensor):
-                output_array = output.detach().float().numpy()
-            else:
-                print(f"Unexpected output type: {type(output)}")
-                continue
-
-            predictions = demo_postprocess(output_array, input_shape)[0]
-            if predictions is None or predictions.shape[0] == 0:
-                print(f"No objects detected in image {idx + 1}.")
-                os.remove(img_name)
-                continue
-
-            boxes = predictions[:, :4]
-            scores = predictions[:, 4:5] * predictions[:, 5:]
-            boxes_xyxy = np.ones_like(boxes)
-            boxes_xyxy[:, 0] = boxes[:, 0] - boxes[:, 2] / 2.0
-            boxes_xyxy[:, 1] = boxes[:, 1] - boxes[:, 3] / 2.0
-            boxes_xyxy[:, 2] = boxes[:, 0] + boxes[:, 2] / 2.0
-            boxes_xyxy[:, 3] = boxes[:, 1] + boxes[:, 3] / 2.0
-            boxes_xyxy /= ratio
-            dets = multiclass_nms(
-                boxes_xyxy, scores, nms_thr=0.45, score_thr=0.1
-            )
-            if dets is not None:
-                final_boxes, final_scores, final_cls_inds = (
-                    dets[:, :4],
-                    dets[:, 4],
-                    dets[:, 5],
-                )
-                for box, score, cls_ind in zip(
-                    final_boxes, final_scores, final_cls_inds
-                ):
-                    class_name = COCO_CLASSES[int(cls_ind)]
-                    x_min, y_min, x_max, y_max = map(int, box)
-                    # Draw bounding box and label on the image
-                    cv2.rectangle(
-                        orig_img,
-                        (x_min, y_min),
-                        (x_max, y_max),
-                        (0, 255, 0),
-                        2,
-                    )
-                    cv2.putText(
-                        orig_img,
-                        f"{class_name} {score:.2f}",
-                        (x_min, y_min - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.5,
-                        (0, 255, 0),
-                        2,
-                    )
-                # Save the labeled image
-                output_img_name = f"output_{idx + 1}.jpg"
-                cv2.imwrite(output_img_name, orig_img)
-                print(f"Labeled image saved as {output_img_name}.")
-            else:
-                print(f"No detections after NMS in image {idx + 1}.")
-
-            # Remove downloaded input image
-            os.remove(img_name)
-
-        except Exception as e:
-            print(f"Error processing image {idx + 1}: {e}")
-            if os.path.exists(img_name):
-                os.remove(img_name)
-            continue
-
-    # Remove downloaded model weights
-    if os.path.exists(weight_name):
-        os.remove(weight_name)
-        print("Model weights file removed.")
 
 
 if __name__ == "__main__":
-    # YOLOX model variant (e.g., yolox_nano, yolox_tiny, yolox_s, yolox_m, yolox_l, yolox_x)
-    variant = "yolox_nano"
+    run_yolox_pytorch(variant="yolox_s")  # yolox_nano, yolox_tiny, yolox_s, yolox_m, yolox_l, yolox_x 중 
 
-    # List of image URLs to process
-    image_urls = [
-        "http://images.cocodataset.org/val2017/000000397133.jpg"
-      
-    ]
-
-    run_yolox_multiple_images(variant=variant, image_urls=image_urls) 
