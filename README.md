@@ -22,11 +22,8 @@ TT-Buda is the official Tenstorrent AI/ML compiler stack and PyBuda is the Pytho
 For a simple, starting basics of TT-Buda
 
  - `install_ttbuda` ->  [Installation guide for TT-Buda](https://github.com/eSlimKorea/TT-Buda-Installation).
-<br>
  - `Test NPL Models` -> [Run your first NLP models with TT-Buda]().
-<br>
  - `Test CV Models` -> [Run your first CV models with TT-Buda]().
-<br>
  - `batched_inputs` -> [Learn how to run with batched inputs and how to benchmark models on TT-Buda]().
 <br>
 
