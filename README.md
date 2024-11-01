@@ -25,9 +25,6 @@ For a simple, starting basics of TT-Buda
  - `Test NPL Models` -> [Run your first NLP models with TT-Buda]().
  - `Test CV Models` -> [Run your first CV models with TT-Buda]().
  - `batched_inputs` -> [Learn how to run with batched inputs and how to benchmark models on TT-Buda]().
-<br>
-
-
 
 ## **Test Models**
 
